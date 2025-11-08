@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Login with Email + Code</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;display:grid;place-items:center;height:100vh;margin:0}
+.card{width:360px;background:white;padding:20px;border-radius:8px;box-shadow:0 8px 30px rgba(2,6,23,.1)}
+input{width:100%;padding:10px;margin:8px 0;border:1px solid #ddd;border-radius:6px}
+button{width:100%;padding:10px;margin-top:8px;border:0;border-radius:6px;background:#2563eb;color:white;font-weight:600;cursor:pointer}
+.small{font-size:13px;color:#6b7280;margin-top:8px}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h3 id="title">Sign in</h3>
+    <div id="step1">
+      <input id="email" placeholder="Email" type="email" />
+      <input id="password" placeholder="Password" type="password" />
+      <button id="signin">Sign in & send code</button>
+      <div id="msg" class="small" style="color:#b91c1c"></div>
+    </div>
+
+    <div id="step2" style="display:none">
+      <input id="code" placeholder="Enter code" />
+      <button id="verify">Verify</button>
+      <button id="back" style="background:#6b7280;margin-top:6px">Back</button>
+      <div id="msg2" class="small" style="color:#b91c1c"></div>
+    </div>
+  </div>
+
+<script>
+document.getElementById('signin').addEventListener('click', async () => {
+  document.getElementById('msg').textContent = '';
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if(!email || !password){ document.getElementById('msg').textContent='Fill both fields'; return; }
+  try {
+    const res = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) });
+    const j = await res.json().catch(()=>({error:'Network'}));
+    if(!res.ok){ document.getElementById('msg').textContent = j.error || 'Error'; return; }
+    // show step 2
+    document.getElementById('step1').style.display='none';
+    document.getElementById('step2').style.display='block';
+    document.getElementById('title').textContent='Enter code';
+  } catch (e) {
+    document.getElementById('msg').textContent = 'Could not reach server';
+  }
+});
+
+document.getElementById('verify').addEventListener('click', async () => {
+  document.getElementById('msg2').textContent='';
+  const email = document.getElementById('email').value.trim();
+  const code = document.getElementById('code').value.trim();
+  if(!code){ document.getElementById('msg2').textContent='Enter code'; return; }
+  try {
+    const res = await fetch('/api/verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, code }) });
+    const j = await res.json().catch(()=>({error:'Network'}));
+    if(!res.ok){ document.getElementById('msg2').textContent = j.error || 'Invalid'; return; }
+    alert('Authenticated — you may now access protected resources.');
+    window.location.href = '/protected.html';
+  } catch (e) {
+    document.getElementById('msg2').textContent = 'Could not reach server';
+  }
+});
+
+document.getElementById('back').addEventListener('click', () => {
+  document.getElementById('step1').style.display='block';
+  document.getElementById('step2').style.display='none';
+  document.getElementById('title').textContent='Sign in';
+});
+</script>
+</body>
+</html>

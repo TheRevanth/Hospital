@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Doctor Dashboard — Single File (Offline)</title>
+<style>
+  :root{
+    --bg:#f6f7fb;--card:#ffffff;--text:#1f2937;--muted:#6b7280;--brand:#2563eb;
+    --line:#e5e7eb;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,Arial}
+  .layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+  aside{background:var(--brand);color:#fff;padding:16px;position:sticky;top:0;height:100vh}
+  .brand{font-weight:700;margin-bottom:12px}
+  .nav a{display:block;color:#eaf2ff;text-decoration:none;padding:10px 12px;border-radius:10px;margin:4px 0}
+  .nav a.active,.nav a:hover{background:rgba(255,255,255,.15);color:#fff}
+  main{padding:18px}
+  .topbar{display:none}
+  @media(max-width:900px){
+    .layout{grid-template-columns:1fr}
+    aside{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:.2s;width:260px;z-index:30}
+    aside.show{transform:translateX(0)}
+    .topbar{display:flex;gap:8px;align-items:center;background:#fff;border-bottom:1px solid var(--line);padding:8px 12px;position:sticky;top:0;z-index:20}
+    main{padding:12px}
+  }
+  .btn{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);background:#fff;padding:8px 12px;border-radius:10px;cursor:pointer}
+  .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .btn.ghost{border-color:transparent;background:transparent}
+  .btn.small{padding:6px 10px;font-size:12px}
+  .row{display:grid;gap:12px}
+  .row.cols-3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:900px){.row.cols-3{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 6px 18px rgba(10,20,40,.04)}
+  .card .hd{padding:12px 14px;border-bottom:1px solid var(--line);font-weight:600}
+  .card .bd{padding:14px}
+  .muted{color:var(--muted)}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left}
+  tbody tr:hover{background:#f2f6ff}
+  th.sort{cursor:pointer}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff}
+  .right{display:flex;justify-content:flex-end;gap:8px}
+  .grid{display:grid;gap:10px}
+  .g2{grid-template-columns:1fr 1fr}
+  @media(max-width:640px){.g2{grid-template-columns:1fr}}
+  input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .stat{display:flex;justify-content:space-between;align-items:center;padding:12px 14px}
+  .pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px}
+  .ok{background:#dcfce7;color:#166534}.warn{background:#fef3c7;color:#92400e}.bad{background:#fee2e2;color:#991b1b}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+  .dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+  .footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  dialog{border:none;border-radius:16px;padding:0;width:min(680px,95vw)}
+  dialog::backdrop{background:rgba(0,0,0,.4)}
+  .modal-hd{padding:12px 14px;border-bottom:1px solid var(--line);font-weight:600;background:#fff;border-radius:16px 16px 0 0}
+  .modal-bd{padding:14px;background:#fff}
+  .modal-ft{padding:12px 14px;border-top:1px solid var(--line);background:#fff;border-radius:0 0 16px 16px;display:flex;justify-content:flex-end;gap:8px}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <button class="btn" id="btnMenu">☰</button>
+    <strong>Doctor Dashboard</strong>
+  </div>
+  <div class="layout">
+    <aside id="sidebar">
+      <div class="brand">🩺 Doctor Dashboard</div>
+      <nav class="nav">
+        <a href="#" data-section="dash" class="active">Overview</a>
+        <a href="#" data-section="patients">Patients</a>
+        <a href="#" data-section="apps">Appointments</a>
+        <a href="#" data-section="live">Live Monitor</a>
+        <hr>
+        <a href="#" id="btnLogout">Logout</a>
+      </nav>
+    </aside>
+
+    <main>
+      <!-- DASHBOARD -->
+      <section id="sec-dash">
+        <div class="row cols-3">
+          <div class="card"><div class="stat"><div><div class="muted">Total Patients</div><div id="statTotal" class="h4"></div></div><div>👥</div></div></div>
+          <div class="card"><div class="stat"><div><div class="muted">Today’s Appointments</div><div id="statToday" class="h4"></div></div><div>📅</div></div></div>
+          <div class="card"><div class="stat"><div><div class="muted">Vitals Alerts</div><div id="statAlerts" class="h4"></div></div><div>⚠️</div></div></div>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <div class="hd">Quick Actions</div>
+          <div class="bd">
+            <button class="btn primary" id="qaAddP">＋ Add Patient</button>
+            <button class="btn" id="qaAddA">＋ New Appointment</button>
+            <button class="btn" id="qaLive">❤️ Open Live Monitor</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PATIENTS -->
+      <section id="sec-patients" hidden>
+        <div class="card">
+          <div class="hd">Patients</div>
+          <div class="bd grid g2">
+            <input id="pSearch" placeholder="Search by name or phone">
+            <div class="right">
+              <button class="btn primary" id="btnAddPatient">＋ Add</button>
+            </div>
+            <div class="grid" style="grid-column:1/-1">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="sort" data-sort="name">Name</th>
+                    <th class="sort" data-sort="age">Age</th>
+                    <th>Gender</th>
+                    <th>Condition</th>
+                    <th>Phone</th>
+                    <th class="right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="pRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="muted" id="pInfo">0–0 of 0</div>
+            <div>
+              <button class="btn" id="pPrev">Prev</button>
+              <button class="btn" id="pNext">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- APPOINTMENTS -->
+      <section id="sec-apps" hidden>
+        <div class="card">
+          <div class="hd">Appointments</div>
+          <div class="bd">
+            <div class="right" style="margin-bottom:10px">
+              <button class="btn primary" id="btnAddApp">＋ Schedule</button>
+            </div>
+            <table>
+              <thead><tr><th>Patient</th><th>Date</th><th>Time</th><th>Reason</th><th>Status</th><th class="right">Actions</th></tr></thead>
+              <tbody id="aRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- LIVE MONITOR -->
+      <section id="sec-live" hidden>
+        <div class="card">
+          <div class="hd">Live Monitor <span class="muted">BP, HR, SpO₂, Temp</span></div>
+          <div class="bd">
+            <div class="right" style="margin-bottom:10px">
+              <button class="btn" id="btnPause">⏸ Pause</button>
+              <button class="btn" id="btnResume" disabled>▶ Resume</button>
+            </div>
+            <table>
+              <thead><tr><th>Patient</th><th>BP</th><th>HR</th><th>SpO₂</th><th>Temp</th><th>Status</th><th class="right">Actions</th></tr></thead>
+              <tbody id="mRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- PATIENT MODAL -->
+  <dialog id="dlgPatient">
+    <form method="dialog" id="patientForm">
+      <div class="modal-hd" id="dlgPTitle">Add Patient</div>
+      <div class="modal-bd grid g2">
+        <input type="hidden" id="pid">
+        <div><label>Name</label><input id="pName" required></div>
+        <div><label>Age</label><input id="pAge" type="number" min="0" required></div>
+        <div><label>Gender</label><select id="pGender"><option>Male</option><option>Female</option><option>Other</option></select></div>
+        <div><label>Condition</label><input id="pCond" placeholder="e.g., Hypertension"></div>
+        <div><label>Phone</label><input id="pPhone" placeholder="9XXXXXXXXX"></div>
+        <div style="grid-column:1/-1"><label>Notes</label><textarea id="pNotes" rows="3"></textarea></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn" value="cancel">Cancel</button>
+        <button class="btn primary" value="default">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- VIEW MODAL -->
+  <dialog id="dlgView">
+    <div class="modal-hd">Patient Details</div>
+    <div class="modal-bd" id="viewBody"></div>
+    <form method="dialog" class="modal-ft"><button class="btn" value="cancel">Close</button></form>
+  </dialog>
+
+  <!-- APPOINTMENT MODAL -->
+  <dialog id="dlgApp">
+    <form method="dialog" id="appForm">
+      <div class="modal-hd">Schedule Appointment</div>
+      <div class="modal-bd grid g2">
+        <input type="hidden" id="aid">
+        <div style="grid-column:1/-1"><label>Patient</label><select id="aPatient"></select></div>
+        <div><label>Date</label><input id="aDate" type="date" required></div>
+        <div><label>Time</label><input id="aTime" type="time" required></div>
+        <div style="grid-column:1/-1"><label>Reason</label><input id="aReason"></div>
+        <div style="grid-column:1/-1"><label>Status</label><select id="aStatus"><option>Scheduled</option><option>Completed</option><option>Cancelled</option></select></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn" value="cancel">Cancel</button>
+        <button class="btn primary" value="default">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+<script>
+  // ===== Helpers =====
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const LS_P = 'docdash_patients_v2';
+  const LS_A = 'docdash_apps_v2';
+  const pageSize = 10;
+  let state = { page:1, sort:{key:'name', dir:1}, q:'', live:true };
+
+  function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : 'id_'+Math.random().toString(36).slice(2)); }
+  function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
+  function toast(msg){
+    const t=document.createElement('div');
+    t.textContent=msg; t.style.cssText='position:fixed;right:12px;bottom:12px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:.95;z-index:9999';
+    document.body.appendChild(t); setTimeout(()=>t.remove(),1500);
+  }
+
+  // ===== Data =====
+  function loadP(){
+    let arr = JSON.parse(localStorage.getItem(LS_P) || '[]');
+    if(arr.length===0){
+      const first=['Aarav','Vihaan','Aditya','Sai','Arjun','Ayaan','Ishaan','Kabir','Reyansh','Atharv','Anaya','Aadhya','Anika','Diya','Myra','Aarohi','Ira','Sara','Navya','Ayra'];
+      const last=['Sharma','Reddy','Naidu','Patel','Gupta','Khan','Singh','Rao','Iyer','Das'];
+      const cond=['General Checkup','Diabetes','Hypertension','Cold & Flu','Back Pain'];
+      for(let i=0;i<50;i++){
+        const name = first[Math.floor(Math.random()*first.length)] + ' ' + last[Math.floor(Math.random()*last.length)];
+        arr.push({id:uid(), name, age:18+Math.floor(Math.random()*65), gender: Math.random()>.5?'Male':'Female', condition: cond[Math.floor(Math.random()*cond.length)], phone:'9'+(100000000+Math.floor(Math.random()*899999999)), notes:'', createdAt:Date.now()});
+      }
+      localStorage.setItem(LS_P, JSON.stringify(arr));
+    }
+    return arr;
+  }
+  function saveP(arr){ localStorage.setItem(LS_P, JSON.stringify(arr)); }
+  function loadA(){ return JSON.parse(localStorage.getItem(LS_A) || '[]'); }
+  function saveA(arr){ localStorage.setItem(LS_A, JSON.stringify(arr)); }
+
+  // ===== Live vitals =====
+  const vitals = new Map(); // id -> {sys,dia,hr,spo2,temp,history:[{t,sys,hr}]}
+  function ensureVitals(){
+    for(const p of loadP()){
+      if(!vitals.has(p.id)){
+        vitals.set(p.id, { sys:115+Math.floor(Math.random()*20), dia:70+Math.floor(Math.random()*10), hr:65+Math.floor(Math.random()*20), spo2:96+Math.floor(Math.random()*3), temp:36.5+Math.random()*0.7, history:[] });
+      }
+    }
+  }
+  function walkVitals(){
+    const now = Date.now();
+    for(const v of vitals.values()){
+      v.sys = clamp(v.sys + Math.round((Math.random()*4-2)), 90, 180);
+      v.dia = clamp(v.dia + Math.round((Math.random()*4-2)), 50, 120);
+      v.hr  = clamp(v.hr  + Math.round((Math.random()*6-3)), 45, 160);
+      v.spo2= clamp(v.spo2+ Math.round((Math.random()*2-1)), 85, 100);
+      v.temp= clamp(v.temp+ (Math.random()-0.5)*0.1, 35.0, 40.0);
+      v.history.push({t:now, sys:v.sys, hr:v.hr}); if(v.history.length>60) v.history.shift();
+    }
+  }
+  function statusOf(v){
+    const red = v.sys>=160 || v.hr>=130 || v.spo2<=90 || v.temp>=39;
+    const warn= (!red) && (v.sys>=140 || v.hr>=110 || v.spo2<=94 || v.temp>=38);
+    return red?'bad': (warn?'warn':'ok');
+  }
+
+  // ===== Sections =====
+  function show(id){
+    $('#sidebar .nav a.active')?.classList.remove('active');
+    $(`#sidebar .nav a[data-section="${id}"]`)?.classList.add('active');
+    $('#sec-dash').hidden = id!=='dash';
+    $('#sec-patients').hidden = id!=='patients';
+    $('#sec-apps').hidden = id!=='apps';
+    $('#sec-live').hidden = id!=='live';
+  }
+
+  // ===== Patients UI =====
+  function filteredSorted(){
+    const q = state.q.toLowerCase();
+    let pts = loadP().filter(p => p.name.toLowerCase().includes(q) || (p.phone||'').includes(q));
+    const {key,dir} = state.sort;
+    pts.sort((a,b)=> (a[key]>b[key]?1:a[key]<b[key]?-1:0)*dir);
+    return pts;
+  }
+  function renderPatients(){
+    const pts = filteredSorted();
+    const start = (state.page-1)*10;
+    const page = pts.slice(start, start+10);
+    const tb = $('#pRows'); tb.innerHTML='';
+    for(const p of page){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><strong>${p.name}</strong></td><td>${p.age}</td><td>${p.gender}</td><td><span class="badge">${p.condition||''}</span></td><td>${p.phone||''}</td>
+        <td class="right">
+          <button class="btn small" data-act="view" data-id="${p.id}">View</button>
+          <button class="btn small" data-act="edit" data-id="${p.id}">Edit</button>
+          <button class="btn small" data-act="del" data-id="${p.id}">Delete</button>
+        </td>`;
+      tb.appendChild(tr);
+    }
+    $('#pInfo').textContent = `${pts.length? start+1:0}–${Math.min(start+page.length, pts.length)} of ${pts.length}`;
+    $('#pPrev').disabled = state.page===1;
+    $('#pNext').disabled = start+page.length>=pts.length;
+    // actions
+    tb.querySelectorAll('button[data-act]').forEach(btn=>{
+      const id = btn.dataset.id, act=btn.dataset.act;
+      btn.onclick = () => {
+        if(act==='view') openView(id);
+        if(act==='edit') openEdit(id);
+        if(act==='del') delP(id);
+      }
+    });
+    populatePatientSelect();
+    updateStats();
+    renderMonitor();
+  }
+  function openAdd(){
+    $('#dlgPTitle').textContent='Add Patient';
+    $('#pid').value=''; $('#pName').value=''; $('#pAge').value=''; $('#pGender').value='Male';
+    $('#pCond').value=''; $('#pPhone').value=''; $('#pNotes').value='';
+    $('#dlgPatient').showModal();
+  }
+  function openEdit(id){
+    const p = loadP().find(x=>x.id===id); if(!p) return;
+    $('#dlgPTitle').textContent='Edit Patient';
+    $('#pid').value=p.id; $('#pName').value=p.name; $('#pAge').value=p.age; $('#pGender').value=p.gender;
+    $('#pCond').value=p.condition||''; $('#pPhone').value=p.phone||''; $('#pNotes').value=p.notes||'';
+    $('#dlgPatient').showModal();
+  }
+  function openView(id){
+    const p = loadP().find(x=>x.id===id); if(!p) return;
+    const v = vitals.get(id);
+    $('#viewBody').innerHTML = `<div><strong>${p.name}</strong></div>
+    <div class="muted">Age ${p.age} • ${p.gender}</div>
+    <div style="margin:8px 0"><span class="badge">${p.condition||''}</span></div>
+    <div><strong>Phone:</strong> ${p.phone||'-'}</div>
+    <hr>
+    <div><strong>BP:</strong> ${v?Math.round(v.sys)+'/'+Math.round(v.dia):'-'} mmHg</div>
+    <div><strong>HR:</strong> ${v?Math.round(v.hr):'-'} bpm</div>
+    <div><strong>SpO₂:</strong> ${v?Math.round(v.spo2):'-'}%</div>
+    <div><strong>Temp:</strong> ${v?v.temp.toFixed(1):'-'} °C</div>
+    <div style="margin-top:8px"><strong>Notes:</strong><br>${(p.notes||'-').toString().replace(/\n/g,'<br>')}</div>`;
+    $('#dlgView').showModal();
+  }
+  function delP(id){
+    if(!confirm('Delete this patient?')) return;
+    saveP(loadP().filter(p=>p.id!==id));
+    vitals.delete(id);
+    renderPatients(); toast('Patient deleted');
+  }
+  $('#patientForm').addEventListener('close', (e)=>{
+    if($('#patientForm').returnValue!=='default') return; // cancelled
+    const id = $('#pid').value.trim() || uid();
+    const obj = { id,
+      name: $('#pName').value.trim(),
+      age: Number($('#pAge').value||0),
+      gender: $('#pGender').value,
+      condition: $('#pCond').value.trim(),
+      phone: $('#pPhone').value.trim(),
+      notes: $('#pNotes').value.trim(),
+      createdAt: Date.now()
+    };
+    const arr = loadP();
+    const i = arr.findIndex(x=>x.id===id);
+    if(i>-1) arr[i]=obj; else arr.unshift(obj);
+    saveP(arr);
+    ensureVitals();
+    renderPatients(); toast('Patient saved');
+  });
+
+  // ===== Appointments =====
+  function populatePatientSelect(){
+    const sel = $('#aPatient'); if(!sel) return;
+    const arr = filteredSorted();
+    sel.innerHTML = arr.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  }
+  function renderApps(){
+    const apps = loadA();
+    const pts = Object.fromEntries(loadP().map(p=>[p.id,p]));
+    const tb = $('#aRows'); tb.innerHTML='';
+    for(const a of apps){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${pts[a.patientId]?.name||'—'}</td><td>${a.date}</td><td>${a.time}</td><td>${a.reason||''}</td>
+        <td>
+          <select data-id="${a.id}" class="status">
+            ${['Scheduled','Completed','Cancelled'].map(s=>`<option ${s===a.status?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </td>
+        <td class="right">
+          <button class="btn small" data-edit="${a.id}">Edit</button>
+          <button class="btn small" data-del="${a.id}">Delete</button>
+        </td>`;
+      tb.appendChild(tr);
+    }
+    // events
+    tb.querySelectorAll('select.status').forEach(sel=> sel.onchange = () => setAppStatus(sel.dataset.id, sel.value));
+    tb.querySelectorAll('button[data-edit]').forEach(b=> b.onclick = ()=> openEditApp(b.dataset.edit));
+    tb.querySelectorAll('button[data-del]').forEach(b=> b.onclick = ()=> delApp(b.dataset.del));
+    updateStats();
+  }
+  function openAddApp(){
+    $('#aid').value=''; $('#aDate').value=''; $('#aTime').value=''; $('#aReason').value=''; $('#aStatus').value='Scheduled';
+    populatePatientSelect();
+    $('#dlgApp').showModal();
+  }
+  function openEditApp(id){
+    const a = loadA().find(x=>x.id===id); if(!a) return;
+    $('#aid').value=a.id; $('#aPatient').value=a.patientId; $('#aDate').value=a.date; $('#aTime').value=a.time; $('#aReason').value=a.reason||''; $('#aStatus').value=a.status;
+    $('#dlgApp').showModal();
+  }
+  function delApp(id){
+    if(!confirm('Delete this appointment?')) return;
+    saveA(loadA().filter(x=>x.id!==id)); renderApps(); toast('Appointment deleted');
+  }
+  function setAppStatus(id,val){
+    const arr = loadA(); const i = arr.findIndex(x=>x.id===id); if(i>-1){ arr[i].status=val; saveA(arr); toast('Status updated'); updateStats(); }
+  }
+  $('#appForm').addEventListener('close', ()=>{
+    if($('#appForm').returnValue!=='default') return;
+    const id = $('#aid').value.trim() || uid();
+    const a = { id,
+      patientId: $('#aPatient').value,
+      date: $('#aDate').value,
+      time: $('#aTime').value,
+      reason: $('#aReason').value.trim(),
+      status: $('#aStatus').value
+    };
+    const arr = loadA(); const i = arr.findIndex(x=>x.id===id); if(i>-1) arr[i]=a; else arr.unshift(a);
+    saveA(arr); renderApps(); toast('Appointment saved');
+  });
+
+  // ===== Live Monitor =====
+  function renderMonitor(){
+    const pts = filteredSorted();
+    const tb = $('#mRows'); tb.innerHTML='';
+    let alerts = 0;
+    for(const p of pts){
+      const v = vitals.get(p.id); if(!v) continue;
+      const st = statusOf(v); if(st==='bad') alerts++;
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${p.name}</td>
+        <td>${Math.round(v.sys)}/${Math.round(v.dia)}</td>
+        <td>${Math.round(v.hr)}</td>
+        <td>${Math.round(v.spo2)}</td>
+        <td>${v.temp.toFixed(1)}</td>
+        <td><span class="dot ${st}"></span><span class="pill ${st==='ok'?'ok':st==='warn'?'warn':'bad'}">${st.toUpperCase()}</span></td>
+        <td class="right">
+          <button class="btn small" data-view="${p.id}">View</button>
+        </td>`;
+      tb.appendChild(row);
+    }
+    tb.querySelectorAll('button[data-view]').forEach(b => b.onclick = () => openView(b.dataset.view));
+    $('#statAlerts').textContent = alerts;
+  }
+
+  // ===== Stats =====
+  function updateStats(){
+    $('#statTotal').textContent = loadP().length;
+    const today = new Date().toISOString().slice(0,10);
+    $('#statToday').textContent = loadA().filter(a=>a.date===today).length;
+  }
+
+  // ===== Events & Init =====
+  // Navigation
+  $$('#sidebar .nav a[data-section]').forEach(a => a.onclick = e => { e.preventDefault(); show(a.dataset.section); });
+  $('#btnMenu').onclick = () => $('#sidebar').classList.toggle('show');
+  $('#btnLogout').onclick = e => { e.preventDefault(); toast('Logged out'); show('dash'); };
+
+  // Patients controls
+  $('#btnAddPatient').onclick = openAdd;
+  $('#qaAddP').onclick = () => { show('patients'); openAdd(); };
+  $('#pPrev').onclick = () => { state.page=Math.max(1,state.page-1); renderPatients(); };
+  $('#pNext').onclick = () => { state.page++; renderPatients(); };
+  $('#pSearch').oninput = e => { state.q=e.target.value; state.page=1; renderPatients(); };
+  $$('th.sort').forEach(th => th.onclick = () => {
+    const k = th.dataset.sort;
+    state.sort = (state.sort.key===k) ? {key:k, dir: -state.sort.dir} : {key:k, dir:1};
+    renderPatients();
+  });
+
+  // Apps controls
+  $('#btnAddApp').onclick = openAddApp;
+  $('#qaAddA').onclick = () => { show('apps'); openAddApp(); };
+
+  // Live monitor controls
+  $('#qaLive').onclick = () => { show('live'); };
+  $('#btnPause').onclick = () => { state.live=false; $('#btnPause').disabled=true; $('#btnResume').disabled=false; };
+  $('#btnResume').onclick = () => { state.live=true; $('#btnPause').disabled=false; $('#btnResume').disabled=true; };
+
+  // Init
+  ensureVitals(); walkVitals();
+  show('dash'); renderPatients(); renderApps(); renderMonitor(); updateStats();
+
+  setInterval(()=>{ if(!state.live) return; walkVitals(); renderMonitor(); }, 2000);
+</script>
+</body>
+</html>
